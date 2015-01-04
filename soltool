@@ -90,7 +90,7 @@ def main():
         ns.cmd(ns)
     except Exception:
         if ns.debug:
-            pdb.post_mortem()
+            pdb.post_mortem(sys.exc_info()[2])
         raise
 
 

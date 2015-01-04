@@ -3,7 +3,7 @@
 soltool provides the following commands:
 
 view
-====
+----
 
 Usage:
 
@@ -13,7 +13,7 @@ Emits the contents of the FILE as a json dictionary.  If --raw is passed,
 pprint/repr instead.
 
 get-encoding
-============
+------------
 
 Usage:
 
@@ -22,7 +22,7 @@ Usage:
 Emits the AMF encoding version for FILE to stdout (e.g., "0" or "3")
 
 check
-=====
+-----
 
 Usage:
 

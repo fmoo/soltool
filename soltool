@@ -1,0 +1,98 @@
+#!/usr/bin/env python
+
+import argparse
+import binascii
+import json
+import logging
+try:
+    import ipdb as pdb
+except ImportError:
+    import pdb
+import pyamf.sol
+import pyamf.util.pure
+import sys
+
+try:
+    # Use pure python versions
+    import cpyamf.amf0
+    import cpyamf.amf3
+    del cpyamf.amf0
+    del cpyamf.amf3
+except ImportError:
+    # No Extension compiled...
+    pass
+
+
+def get_encoding_version(stream):
+    # This is NOT thread safe
+    stream.seek(16)
+    namelen = stream.read_ushort()
+    stream.seek(21 + namelen)
+    result = stream.read_uchar()
+    stream.seek(0)
+    return result
+
+
+def _get_encoding(ns):
+    stream = pyamf.util.pure.BufferedByteStream(ns.file)
+    print(get_encoding_version(stream))
+
+
+def _view(ns):
+    stream = pyamf.util.pure.BufferedByteStream(ns.file)
+    name, values = pyamf.sol.decode(stream)
+    logging.info("Parsed amf stream with name, '%s'", name)
+
+    if ns.raw:
+        print repr(values)
+    else:
+        print json.dumps(values, indent=4,
+            #default=lambda d: str(d))
+            default=lambda d: binascii.hexlify(str(d)))
+
+
+def _check(ns):
+    istream = pyamf.util.pure.BufferedByteStream(ns.file)
+    encoding = get_encoding_version(istream)
+    name, values = pyamf.sol.decode(istream)
+    ostream = pyamf.sol.encode(name, values, encoding=encoding)
+    if ns.out:
+        logging.debug("Writing %d bytes to %s", len(ostream), ns.out)
+        ns.out.write(ostream.getvalue())
+        ns.out.close()
+    print("OK")
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument('--level', default='DEBUG')
+    ap.add_argument('--debug', action='store_true')
+
+    sp = ap.add_subparsers()
+
+    cmd = sp.add_parser('view')
+    cmd.set_defaults(cmd=_view)
+    cmd.add_argument('file', type=argparse.FileType(mode='r'))
+    cmd.add_argument('--raw', action='store_true')
+
+    cmd = sp.add_parser('check')
+    cmd.set_defaults(cmd=_check)
+    cmd.add_argument('file', type=argparse.FileType(mode='r'))
+    cmd.add_argument('--out', type=argparse.FileType(mode='w'))
+
+    cmd = sp.add_parser('get-encoding')
+    cmd.set_defaults(cmd=_get_encoding)
+    cmd.add_argument('file', type=argparse.FileType(mode='r'))
+
+
+    ns = ap.parse_args()
+    logging.basicConfig(stream=sys.stderr, level=ns.level)
+    try:
+        ns.cmd(ns)
+    except Exception:
+        if ns.debug:
+            pdb.post_mortem()
+        raise
+
+
+if __name__ == '__main__':
+    main()

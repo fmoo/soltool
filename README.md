@@ -1,4 +1,6 @@
-`soltool` is a CLI that provides the following commands
+`soltool` is a CLI for interacting with Flash ".sol" (Local Shared Object) files.
+
+soltool provides the following commands:
 
 view
 ====

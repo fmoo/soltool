@@ -10,7 +10,9 @@ except ImportError:
     import pdb
 import pyamf.sol
 import pyamf.util.pure
+import struct
 import sys
+import zlib
 
 try:
     # Use pure python versions
@@ -33,6 +35,147 @@ def get_encoding_version(stream):
     return result
 
 
+class SDATContext(object):
+    """An SDAT value seems to be a common sol file serialization format.
+
+    It implements its own stream-based binary protocol, but supports a standard
+    method of zlib compression on top of it.
+
+    The parsing algorithm implemented below was reverse engineered by analyzing
+    binary dumps of sol file fields.  It also requires some statefulness for
+    (re)serialiation as there is a many-to-one mapping between flash types and
+    native python types.
+    """
+    def __init__(self):
+        self._field_serializer = {}
+
+    TYPECODE_WRITER = {
+        0x07: 'write_uchar',
+        0x03: 'write_long',
+        0x04: 'write_short',
+        0x02: 'write_uchar',
+        0x06: 'write_double',
+    }
+
+    def read_sdat(self, stream):
+        """Deserializes SDAT data from `stream`.
+
+        Keeps track of which flash datatypes were used for each key, so that
+        if the returned result is reserialized, it can roughly know.
+
+        NOTE: The current implementation does not (yet) track fields against
+        structure depth, so if an embedded structure uses a different data type
+        with the same field names, you will encounter weird bugs.
+        """
+        stream = pyamf.util.pure.BufferedByteStream(stream)
+        n_entries = stream.read_ulong()
+        result = self.read_struct(stream, n_entries)
+        assert stream.tell() == len(stream)
+        return result
+
+    def read_struct(self, stream, n_members):
+        """Deserializes data from `stream` containing `n_members`
+
+        This logic is shared between the top level parsing and substructure
+        parsing, but the header formats are different.
+        """
+        result = {}
+
+        for i in xrange(n_members):
+            strlen = stream.read_ushort()
+            name = stream.read(strlen)
+            typecode = stream.read_ulong()
+            #logging.debug('name: %s (tc=0x%.2x)', repr(name), typecode)
+
+            # REMEMBER THIS FOR LATER
+            self._field_serializer[name] = typecode
+
+            if typecode == 0x07:
+                # bool
+                value = stream.read_uchar()
+                #logging.debug('value: %d', value)
+            elif typecode == 0x14:
+                # struct (??)
+                # bytes 0-5: ??
+                # byte 6: number of members
+                packed = stream.read(6)
+
+                # TODO: Figure out what the rest of these bytes are for.
+                # For now, just treat the bytes as opaque and store them in a
+                # "private" field on the structure.
+                child_members, = struct.unpack('<B', packed[5])
+                value = self.read_struct(stream, child_members)
+
+                # This parsing logic is terrible and relies on a virtual field
+                # to properly track the original struct header.   If there is
+                # an actual field named __header__, things will break, so catch
+                # it with an assert.  Sorry.
+                assert '__header__' not in value
+                value['__header__'] = binascii.hexlify(packed)
+
+                #logging.debug('value: %s', value)
+            elif typecode == 0x03:
+                # signed long
+                value = stream.read_long()
+                #logging.debug('value: %s', repr(value))
+            elif typecode == 0x04:
+                # signed short
+                value = stream.read_short()
+                #logging.debug('value: %s', repr(value))
+            elif typecode == 0x02:
+                # char (unsigned??)
+                value = stream.read_uchar()
+                #logging.debug('value: %s', repr(value))
+            elif typecode == 0x06:
+                # float
+                packed = stream.read(8)
+                value, = struct.unpack('>d', packed)
+                #logging.debug('value: %s', value)
+            else:
+                assert False, ("Unknown typecode",)
+
+            result[name] = value
+
+        return result
+
+    def write_struct(self, stream, obj, name=None):
+        """Reserializes `obj` to `stream`, with `name` for structs.
+
+        write_struct() is currently only possible if you've previously
+        deserialized the object with the same relative format.
+
+        TODO: support serialization of data types without known typecodes
+        or struct headers"""
+
+
+        if '__header__' in obj:
+            assert name is not None
+            stream.write_ushort(len(name))
+            stream.write(name)
+            stream.write_ulong(0x14)
+            stream.write(binascii.unhexlify(obj['__header__']))
+        else:
+            stream.write_ulong(len(obj))
+
+        for k, v in obj.iteritems():
+            if k == '__header__':
+                continue
+
+            if isinstance(v, dict):
+                typecode = 0x14
+                self.write_struct(stream, v, k)
+
+            else:
+                typecode = self._field_serializer[k]
+
+                stream.write_ushort(len(k))
+                stream.write(k)
+                stream.write_ulong(typecode)
+
+                meth = getattr(stream, self.TYPECODE_WRITER[typecode])
+                meth(v)
+
+
 def _get_encoding(ns):
     stream = pyamf.util.pure.BufferedByteStream(ns.file)
     print(get_encoding_version(stream))
@@ -42,6 +185,13 @@ def _view(ns):
     stream = pyamf.util.pure.BufferedByteStream(ns.file)
     name, values = pyamf.sol.decode(stream)
     logging.info("Parsed amf stream with name, '%s'", name)
+
+    if ns.sdat:
+        assert 'SDAT' in values
+        data = values['SDAT']
+        if values.get('compress', False):
+            data = zlib.decompress(str(data))
+        values = SDATContext().read_sdat(data)
 
     if ns.raw:
         print repr(values)
@@ -73,6 +223,7 @@ def main():
     cmd.set_defaults(cmd=_view)
     cmd.add_argument('file', type=argparse.FileType(mode='r'))
     cmd.add_argument('--raw', action='store_true')
+    cmd.add_argument('--sdat', action='store_true')
 
     cmd = sp.add_parser('check')
     cmd.set_defaults(cmd=_check)

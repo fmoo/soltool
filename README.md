@@ -10,7 +10,7 @@ Usage:
 soltool [--level LEVEL] [--debug] view [FILE] [--raw] [--sdat]
 ```
 Emits the contents of the FILE as a json dictionary.  If --raw is passed,
-pprint/repr instead.  If --sdat is passed, decode the data compressed in the 'SDAT' field in the sol file.
+pprint/repr instead.  If --sdat is passed, decode the SDAT encoded amf payload.
 
 get-encoding
 ------------

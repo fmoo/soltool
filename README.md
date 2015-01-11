@@ -51,3 +51,16 @@ $ soltool find-recent
 /home/pete/.macromedia/Flash_Player/#SharedObjects/Y2NDTGYB/thelastdoor.com/swf/extra1/dnff843ax81.swf/savegame.sol
 /home/pete/.macromedia/Flash_Player/#SharedObjects/Y2NDTGYB/thelastdoor.com/swf/extra1/dnff843ax81.swf/Flox.RestSer#/vice.queue.ON2BkMxSaXggeLzP.sol
 ```
+
+edit
+----
+
+Usage:
+```
+soltool [--level LEVEL] [--debug] edit [FILE]
+```
+
+Opens FILE in your preferred $EDITOR, saving changes back to FILE
+
+Note this feature is highly experimental and many complex types
+(byte arrays, vectors, etc) may fail to deserialize or reserialize properly.

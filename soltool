@@ -240,6 +240,45 @@ def _find_recent(ns):
                     print p
 
 
+def _edit(ns):
+    import editor
+    istream = pyamf.util.pure.BufferedByteStream(ns.file)
+    encoding = get_encoding_version(istream)
+    name, values = pyamf.sol.decode(istream)
+    ns.file.close()
+
+    # TODO: Support SDAT-encoded files
+    # TODO: Custom types currently fail, make these work somehow
+    serialized = json.dumps(values, indent=4)
+    edited = editor.edit(contents=serialized)
+    reloaded = json.loads(edited)
+
+    # Merge values with reloaded
+
+    # First, look for deleted fields
+    to_remove = []
+    for k in values.keys():
+        if k not in reloaded:
+            to_remove.append(k)
+
+    # Delete found ones
+    for k in to_remove:
+        del values[k]
+
+    # Now, update existing values
+    for k, v in reloaded.items():
+        # This won't work properly with ByteArray, and other advanced types
+        values[k] = v
+
+    # Re-encode the new values
+    ostream = pyamf.sol.encode(name, values, encoding=encoding)
+
+    # And write them out to the file
+    logging.debug("Writing %d bytes to %s", len(ostream), ns.file.name)
+    with open(os.path.realpath(ns.file.name), mode='wb') as f:
+        f.write(ostream.getvalue())
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--level', default='DEBUG')
@@ -265,6 +304,10 @@ def main():
     cmd = sp.add_parser('find-recent')
     cmd.set_defaults(cmd=_find_recent)
     cmd.add_argument('--maxage', type=int, default=7200)
+
+    cmd = sp.add_parser('edit')
+    cmd.set_defaults(cmd=_edit)
+    cmd.add_argument('file', type=argparse.FileType(mode='r'))
 
     ns = ap.parse_args()
     logging.basicConfig(stream=sys.stderr, level=ns.level)

@@ -236,6 +236,9 @@ def _find_recent(ns):
         logging.debug("Checking %s", d)
         for root, dirs, files in os.walk(d):
             for f in files:
+                if not f.endswith('.sol'):
+                    # Skip filenames that don't end in .sol
+                    continue
                 p = os.path.join(root, f)
                 if os.path.getmtime(p) > time.time() - ns.maxage:
                     print p

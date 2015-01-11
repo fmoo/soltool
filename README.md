@@ -30,3 +30,24 @@ soltool [--level LEVEL] [--debug] check [FILE] [--out OUTFILE]
 ```
 Sanity checks whether FILE can be reserialized without errors.
 Optional OUTFILE specifies a filename to write the reserialized sol contents.
+
+find-recent
+-----------
+
+Usage:
+```
+soltool [--level LEVEL] [--debug] find-recent [--maxage SECONDS]
+```
+
+Searches known flash cookie storage object locations, and emits any that have been
+modified in the last `--maxage` seconds (default: 2h)
+
+Example:
+```
+$ soltool find-recent
+
+/home/pete/.macromedia/Flash_Player/#SharedObjects/Y2NDTGYB/thelastdoor.com/swf/extra1/dnff843ax81.swf/log.txt.sol
+/home/pete/.macromedia/Flash_Player/#SharedObjects/Y2NDTGYB/thelastdoor.com/swf/extra1/dnff843ax81.swf/Flox.ON2BkMxSaXggeLzP.sol
+/home/pete/.macromedia/Flash_Player/#SharedObjects/Y2NDTGYB/thelastdoor.com/swf/extra1/dnff843ax81.swf/savegame.sol
+/home/pete/.macromedia/Flash_Player/#SharedObjects/Y2NDTGYB/thelastdoor.com/swf/extra1/dnff843ax81.swf/Flox.RestSer#/vice.queue.ON2BkMxSaXggeLzP.sol
+```

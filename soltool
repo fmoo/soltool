@@ -10,8 +10,10 @@ except ImportError:
     import pdb
 import pyamf.sol
 import pyamf.util.pure
+import os.path
 import struct
 import sys
+import time
 import zlib
 
 try:
@@ -32,6 +34,21 @@ def get_encoding_version(stream):
     stream.seek(21 + namelen)
     result = stream.read_uchar()
     stream.seek(0)
+    return result
+
+
+def get_soldirs():
+    result = []
+    for path in [
+        '~/.macromedia/Flash_Player/#SharedObjects/',
+        '~/.config/google-chrome/Default/Pepper Data/Shockwave Flash/'
+            'WritableRoot/#SharedObjects/',
+        '~/.config/chromium/Default/Pepper Data/Shockwave Flash/'
+            'WritableRoot/#SharedObjects/',
+    ]:
+        p = os.path.expanduser(path)
+        if os.path.exists(p):
+            result.append(p)
     return result
 
 
@@ -212,6 +229,17 @@ def _check(ns):
         ns.out.close()
     print("OK")
 
+
+def _find_recent(ns):
+    for d in get_soldirs():
+        logging.debug("Checking %s", d)
+        for root, dirs, files in os.walk(d):
+            for f in files:
+                p = os.path.join(root, f)
+                if os.path.getmtime(p) > time.time() - ns.maxage:
+                    print p
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--level', default='DEBUG')
@@ -234,6 +262,9 @@ def main():
     cmd.set_defaults(cmd=_get_encoding)
     cmd.add_argument('file', type=argparse.FileType(mode='r'))
 
+    cmd = sp.add_parser('find-recent')
+    cmd.set_defaults(cmd=_find_recent)
+    cmd.add_argument('--maxage', type=int, default=7200)
 
     ns = ap.parse_args()
     logging.basicConfig(stream=sys.stderr, level=ns.level)

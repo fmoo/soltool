@@ -279,8 +279,9 @@ def _edit(ns):
 
     # And write them out to the file
     logging.debug("Writing %d bytes to %s", len(ostream), ns.file.name)
+    data = ostream.getvalue()
     with open(os.path.realpath(ns.file.name), mode='wb') as f:
-        f.write(ostream.getvalue())
+        f.write(data)
 
 
 def main():

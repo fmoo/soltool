@@ -222,6 +222,7 @@ def _check(ns):
     istream = pyamf.util.pure.BufferedByteStream(ns.file)
     encoding = get_encoding_version(istream)
     name, values = pyamf.sol.decode(istream)
+    # TODO: add support for --sol flag
     ostream = pyamf.sol.encode(name, values, encoding=encoding)
     if ns.out:
         logging.debug("Writing %d bytes to %s", len(ostream), ns.out)
@@ -281,7 +282,7 @@ def _edit(ns):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument('--level', default='DEBUG')
+    ap.add_argument('--level', default='INFO')
     ap.add_argument('--debug', action='store_true')
 
     sp = ap.add_subparsers()
